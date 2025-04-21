@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { YoutubeTranscript } from "youtube-transcript";
+import axios from 'axios';
 
 const YoutubeRag = () => {
   const [videoUrl, setVideoUrl] = useState("");
@@ -8,37 +8,64 @@ const YoutubeRag = () => {
   const [userInput, setUserInput] = useState("");
   const [transcript, setTranscript] = useState("");
 
-  const getBotReply = (userInput, transcript, Message) => {};
-  const handleChatClick = () => {
-    const id = extractVideoId(videoUrl);
-    setVideoId(id);
-    setMessages([]);
+
+  const handleChatClick = async () => {
+    const id = await extractVideoId(videoUrl);
+    if (id) {
+      setVideoId(id);
+      setMessages([]);
+    }
   };
 
-  const extractVideoId = async (url) => {
+  const extractVideoId = (url) => {
     try {
       const videoId = url.split("v=")[1]?.split("&")[0];
       if (!videoId) throw new Error("Invalid YouTube URL");
-
-      const transcript = await YoutubeTranscript.fetchTranscript(videoId);
-      setTranscript(transcript);
-
+      console.log('Extracted Video ID:', videoId);
       return videoId;
     } catch (error) {
       console.error("Failed to extract transcript:", error);
       return null;
     }
   };
+
+  const sendChatAIRequest = async (userInput, newMessages, videoId) => {
+    try {
+      console.log('Sending request to backend:', {
+        UserQuery: { data: userInput },
+        oldMsg: { data: newMessages },
+        videoID: { data: videoId }
+      });
+  
+      const res = await axios.post('/chatAI', {
+        UserQuery: { data: userInput },
+        oldMsg: { data: newMessages },
+        videoID: { data: videoId }
+      });
+  
+      if (res.data) {
+        console.log('Response from backend:', res.data);
+        setTranscript(res.data.transcript); // Store transcript
+        return res.data.responseAI; // Bot reply
+      }
+    } catch (error) {
+      console.error('Request failed:', error);
+      return 'Error: Unable to fetch AI response.';
+    }
+  };
+  
+
   const handleSend = async () => {
     if (!userInput.trim()) return;
+
     const newMessages = [...messages, { sender: "user", text: userInput }];
     setMessages(newMessages);
     setUserInput("");
 
-    // Simulate/Call backend for response
-    const response = await getBotReply(userInput, transcript); // Your logic here
-    setMessages([...newMessages, { sender: "bot", text: response }]);
+    const botReply = await sendChatAIRequest(userInput, newMessages, videoId);
+    setMessages([...newMessages, { sender: "bot", text: botReply }]);
   };
+
   return (
     <section className="w-full px-10 py-20 bg-black">
       <div className="max-w-6xl mx-auto">
